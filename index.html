@@ -119,6 +119,7 @@ html{background:var(--bg)} body{background:transparent}
     <div id="setupFields"></div>
     <div class="err" id="setupErr"></div>
     <button class="btn-pri full" id="setupSave">حفظ وبدء اللعب</button>
+    <button class="btn-ghost full" id="setupRestore" style="margin-top:6px">♻️ عندي نسخة احتياطية</button>
     <button class="btn-ghost full hidden" id="setupCancel" style="margin-top:6px">رجوع بدون حفظ</button>
   </div>
 
@@ -156,6 +157,8 @@ html{background:var(--bg)} body{background:transparent}
         <div class="sub" style="margin:10px 0 6px">تغيير كلمة المرور (كل لاعب يغيّر كلمته فقط):</div>
         <div class="g2" id="pwBtns" style="margin-bottom:14px"></div>
         <button class="btn-sec full" id="btnRename" style="margin-bottom:8px">تعديل أسماء اللاعبين</button>
+        <button class="btn-sec full" id="btnBackup" style="margin-bottom:8px">💾 نسخة احتياطية</button>
+        <button class="btn-sec full" id="btnRestore" style="margin-bottom:8px">♻️ استرجاع نسخة احتياطية</button>
         <button class="btn-loss full" id="btnReset">تصفير كل النتائج (يتطلب كلمات مرور الأربعة)</button>
       </div>
       <div class="note" id="storeNote"></div>
@@ -248,6 +251,7 @@ function showSetup(rename){
   $("setupFields").innerHTML=h;
   $("setupSave").textContent=rename?"حفظ الأسماء":"حفظ وبدء اللعب";
   $("setupCancel").classList.toggle("hidden",!rename);
+  $("setupRestore").classList.toggle("hidden",!!rename);
   $("setupSave").onclick=async()=>{
     $("setupErr").textContent="";
     const names=[0,1,2,3].map(i=>$("sn"+i).value.trim());
@@ -442,6 +446,41 @@ $("btnRename").onclick=()=>showSetup(true);
 $("setupCancel").onclick=()=>{showMain();go("dash")};
 
 
+
+/* ---------- backup / restore ---------- */
+$("btnBackup").onclick=()=>{
+  const code="HAO1:"+btoa(unescape(encodeURIComponent(JSON.stringify(S))));
+  $("pwSheet").innerHTML=`<div class="row between"><b style="font-size:18px">💾 نسخة احتياطية</b><button class="btn-ghost" id="bkX">✕</button></div>
+    <div class="sub" style="margin:6px 0">انسخ هذا النص وأرسله لنفسك (واتساب أو ملاحظات). يحتوي كل النتائج والأسماء.</div>
+    <textarea id="bkTxt" readonly style="width:100%;height:140px;font-size:12px;direction:ltr;border:1px solid var(--line);border-radius:12px;padding:10px">${code}</textarea>
+    <button class="btn-pri full" id="bkCopy" style="margin-top:8px">نسخ النص</button>
+    <div class="note" id="bkMsg"></div>`;
+  $("ovPw").classList.add("show");
+  $("bkX").onclick=()=>closeOv("ovPw");
+  $("bkCopy").onclick=async()=>{
+    try{await navigator.clipboard.writeText(code);$("bkMsg").textContent="تم النسخ ✓ الصقه في واتساب أو الملاحظات."}
+    catch(e){const t=$("bkTxt");t.focus();t.select();t.setSelectionRange(0,code.length);$("bkMsg").textContent="النص محدّد: اضغط عليه ثم اختر «نسخ»."}
+  };
+};
+$("btnRestore").onclick=()=>{
+  $("pwSheet").innerHTML=`<div class="row between"><b style="font-size:18px">♻️ استرجاع نسخة احتياطية</b><button class="btn-ghost" id="rsX">✕</button></div>
+    <div class="sub" style="margin:6px 0">الصق نص النسخة الاحتياطية هنا. سيحلّ محلّ كل البيانات الحالية.</div>
+    <textarea id="rsTxt" style="width:100%;height:140px;font-size:12px;direction:ltr;border:1px solid var(--line);border-radius:12px;padding:10px"></textarea>
+    <div class="err" id="rsErr"></div>
+    <button class="btn-loss full" id="rsOk">استرجاع</button>`;
+  $("ovPw").classList.add("show");
+  $("rsX").onclick=()=>closeOv("ovPw");
+  $("rsOk").onclick=()=>{
+    let d=null;
+    try{const t=$("rsTxt").value.trim();if(!t.startsWith("HAO1:"))throw 0;d=JSON.parse(decodeURIComponent(escape(atob(t.slice(5)))))}catch(e){}
+    if(!d||!Array.isArray(d.players)||d.players.length!==4)return $("rsErr").textContent="النص غير صحيح. تأكّد أنك نسخته كاملاً.";
+    if($("rsOk").dataset.sure!=="1"){$("rsOk").dataset.sure="1";$("rsOk").textContent="متأكد؟ اضغط مرة أخرى للاسترجاع";return}
+    S=d;S.log=Array.isArray(S.log)?S.log:[];pend=[0,1,2,3].map(()=>({w:0,l:0}));
+    addLog(null,"استرجاع نسخة احتياطية");commit();closeOv("ovPw");showMain();go("dash");toast("تم الاسترجاع ✓");
+  };
+};
+
+$("setupRestore").onclick=()=>$("btnRestore").onclick();
 /* ---------- offline ---------- */
 if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js").catch(()=>{})}
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
